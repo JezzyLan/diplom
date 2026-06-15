@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Расчет теплопотерь здания — Панель управления</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+            padding: 20px;
+        }
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        h2, h3 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        h3 {
+            text-align: left;
+            border-bottom: 2px solid #34495e;
+            padding-bottom: 5px;
+            margin-top: 25px;
+            font-size: 18px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        .label-hint {
+            font-size: 12px;
+            color: #7f8c8d;
+            font-weight: normal;
+        }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        .layer-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        .layer-row select { flex: 2; }
+        .layer-row input { flex: 1; }
+        .btn-delete {
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-delete:hover { background-color: #c0392b; }
+
+        .btn-add {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .btn-add:hover { background-color: #2980b9; }
+
+        button[type="submit"] {
+            width: 100%;
+            padding: 12px;
+            background-color: #2ecc71;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+        button[type="submit"]:hover { background-color: #27ae60; }
+
+        .result-box {
+            margin-top: 25px;
+            padding: 15px;
+            background-color: #eef7fc;
+            border-left: 5px solid #3498db;
+            border-radius: 4px;
+            display: none;
+        }
+        .error-box {
+            margin-top: 25px;
+            padding: 15px;
+            background-color: #fde8e8;
+            border-left: 5px solid #e74c3c;
+            border-radius: 4px;
+            color: #c0392b;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Автоматизированный расчет теплового баланса</h2>
+
+    <form id="calcForm" onsubmit="calculateEnergy(event)">
+        <h3>1. Параметры здания</h3>
+        <div class="form-group">
+            <label for="cityId">Выберите город:</label>
+            <select id="cityId" required>
+                <option value="">Загрузка списка городов из БД...</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="buildingVolume">Внутренний объем здания (м³):</label>
+            <input type="number" step="0.1" id="buildingVolume" value="450.0" min="0.1" required>
+        </div>
+        <div class="form-group">
+            <label for="floorArea">Площадь пола (м²): <span class="label-hint">(для расчета бытовых тепловыделений)</span></label>
+            <input type="number" step="0.1" id="floorArea" value="150.0" min="0.1" required>
+        </div>
+
+        <h3>2. Желаемый микроклимат</h3>
+        <div class="form-group">
+            <label for="tInsideWinter">Температура в помещении зимой (°C):</label>
+            <input type="number" id="tInsideWinter" value="22" min="12" max="30" required>
+        </div>
+        <div class="form-group">
+            <label for="tInsideSummer">Температура в помещении летом (°C):</label>
+            <input type="number" id="tInsideSummer" value="24" min="16" max="30" required>
+        </div>
+
+        <h3>3. Конструкция наружной стены</h3>
+        <div class="form-group">
+            <label for="wallArea">Общая площадь стен (м²):</label>
+            <input type="number" step="0.1" id="wallArea" value="120.0" min="0.1" required>
+        </div>
+
+        <label>Слои стены <span class="label-hint">(указываются в миллиметрах (мм), изнутри наружу):</span></label>
+        <div id="layersContainer">
+            </div>
+        <button type="button" class="btn-add" onclick="addLayerRow()">+ Добавить слой</button>
+
+        <button type="submit">Рассчитать</button>
+    </form>
+
+    <div id="resultBox" class="result-box">
+        <h3>Результаты теплотехнического расчета:</h3>
+        <p><strong>Пиковая нагрузка на отопление (зима):</strong> <span id="resWinter"></span> Вт</p>
+        <p><strong>Пиковая нагрузка на кондиционирование (лето):</strong> <span id="resSummer"></span> Вт</p>
+    </div>
+
+    <div id="errorBox" class="error-box"></div>
+</div>
+
+<script>
+// Справочник материалов строго соответствует вашему seed.py (таблица materials)
+const materialsLibrary = [
+    { id: 1, name: "Кирпич керамический пустотелый" },
+    { id: 2, name: "Железобетон" },
+    { id: 3, name: "Минераловатная плита (утеплитель)" },
+    { id: 4, name: "Пенополистирол (EPS)" },
+    { id: 5, name: "Дерево (сосна поперек волокон)" }
+];
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadCities();
+    // Инициализируем форму дефолтным пирогом стены (например, кирпич 510мм + минвата 100мм)
+    addLayerRow(1, 510);
+    addLayerRow(3, 100);
+});
+
+function addLayerRow(defaultMaterialId = "", defaultThicknessMm = "") {
+    const container = document.getElementById('layersContainer');
+    const row = document.createElement('div');
+    row.className = 'layer-row';
+
+    // Создаем выпадающий список (только названия материалов)
+    const select = document.createElement('select');
+    select.required = true;
+    materialsLibrary.forEach(mat => {
+        const opt = document.createElement('option');
+        opt.value = mat.id; // Передаем ID для БД
+        opt.textContent = mat.name; // Отображаем только название, без коэффициентов
+        if(mat.id === defaultMaterialId) opt.selected = true;
+        select.appendChild(opt);
+    });
+
+    // Создаем поле ввода толщины в мм
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.placeholder = 'Толщина (мм)';
+    input.min = '1';
+    input.step = '1';
+    input.required = true;
+    if(defaultThicknessMm) input.value = defaultThicknessMm;
+
+    // Кнопка удаления
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'btn-delete';
+    deleteBtn.textContent = '✕';
+    deleteBtn.onclick = () => row.remove();
+
+    row.appendChild(select);
+    row.appendChild(input);
+    row.appendChild(deleteBtn);
+    container.appendChild(row);
+}
+
+async function loadCities() {
+    const citySelect = document.getElementById('cityId');
+    try {
+        const response = await fetch('http://127.0.0.1:8000/api/v1/regions');
+        if (!response.ok) throw new Error('Ошибка при запросе к БД');
+        const cities = await response.json();
+
+        citySelect.innerHTML = '<option value="">-- Выберите город из БД --</option>';
+        cities.forEach(city => {
+            const option = document.createElement('option');
+            option.value = city.id;
+            option.textContent = city.name;
+            citySelect.appendChild(option);
+        });
+    } catch (error) {
+        console.warn("Бэкенд недоступен или эндпоинт не добавлен. Включаю резервный список из seed.py.");
+        // Резервный список в точности как в seed.py
+        const mockCities = [
+            {id: 1, name: "Москва"},
+            {id: 2, name: "Санкт-Петербург"},
+            {id: 3, name: "Краснодар"},
+            {id: 4, name: "Новосибирск"}
+        ];
+        citySelect.innerHTML = '<option value="">-- Выберите город (Локальный демо-режим) --</option>';
+        mockCities.forEach(city => {
+            const option = document.createElement('option');
+            option.value = city.id;
+            option.textContent = city.name;
+            citySelect.appendChild(option);
+        });
+    }
+}
+
+async function calculateEnergy(event) {
+    event.preventDefault();
+
+    const resultBox = document.getElementById('resultBox');
+    const errorBox = document.getElementById('errorBox');
+    resultBox.style.display = 'none';
+    errorBox.style.display = 'none';
+
+    // Собираем динамические слои
+    const layerRows = document.querySelectorAll('.layer-row');
+    const layersPayload = [];
+
+    layerRows.forEach(row => {
+        const matId = parseInt(row.querySelector('select').value);
+        const thicknessMm = parseFloat(row.querySelector('input').value);
+
+        layersPayload.push({
+            material_id: matId,
+            thickness: thicknessMm / 1000 // ВАЖНО: Конвертируем МИЛЛИМЕТРЫ в МЕТРЫ для Pydantic схемы!
+        });
+    });
+
+    if (layersPayload.length === 0) {
+        errorBox.innerText = "Ошибка: Добавьте хотя бы один слой для конструкции стены.";
+        errorBox.style.display = 'block';
+        return;
+    }
+
+    // Формируем JSON структуру в точном соответствии с CalculationRequest из schemas.py
+    const payload = {
+        city_id: parseInt(document.getElementById('cityId').value),
+        building_volume: parseFloat(document.getElementById('buildingVolume').value),
+        floor_area: parseFloat(document.getElementById('floorArea').value),
+        t_inside_winter: parseFloat(document.getElementById('tInsideWinter').value),
+        t_inside_summer: parseFloat(document.getElementById('tInsideSummer').value),
+        structures: [
+            {
+                name: "Наружная стена",
+                type: "wall",
+                area: parseFloat(document.getElementById('wallArea').value),
+                orientation: "N",
+                layers: layersPayload
+            }
+        ]
+    };
+
+    try {
+        const response = await fetch('http://127.0.0.1:8000/api/v1/calculate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(JSON.stringify(errData.detail || "Ошибка валидации сервера"));
+        }
+
+        const data = await response.json(); // Ожидаем CalculationResult (q_heating_total_watts, q_cooling_total_watts)
+
+        document.getElementById('resWinter').innerText = data.q_heating_total_watts.toFixed(2);
+        document.getElementById('resSummer').innerText = data.q_cooling_total_watts.toFixed(2);
+        resultBox.style.display = 'block';
+    } catch (error) {
+        errorBox.innerText = `Ошибка при расчете: ${error.message}`;
+        errorBox.style.display = 'block';
+    }
+}
+</script>
+
+</body>
+</html>
