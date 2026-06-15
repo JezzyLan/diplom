@@ -1,5 +1,6 @@
 # main.py - Главный модуль веб-приложения FastAPI
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
+from fastapi.templating import Jinja2Templates
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from typing import Dict
@@ -12,6 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 app = FastAPI(title="API Системы автоматизированного расчета")
+
+templates = Jinja2Templates(directory="templates")
 
 # Разрешаем запросы с любых доменов (CORS) для демонстрации
 app.add_middleware(
@@ -105,3 +108,11 @@ async def get_regions(db: AsyncSession = Depends(get_db)):
     """Эндпоинт для получения списка городов из БД для фронтенда"""
     result = await db.execute(text("SELECT id, city_name AS name FROM climatology ORDER BY city_name"))
     return result.mappings().all()
+
+
+@app.get('/')
+async def get_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="app.html"
+    )
