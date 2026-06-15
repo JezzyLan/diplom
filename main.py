@@ -30,7 +30,6 @@ SOLAR_INTENSITY: Dict[str, float] = {"N": 95.0, "S": 210.0, "E": 175.0, "W": 175
 
 @app.post("/api/v1/calculate", response_model=CalculationResult, status_code=status.HTTP_200_OK)
 async def process_thermal_calculation(request: CalculationRequest, db: AsyncSession = Depends(get_db)):
-    # ... дальше весь код эндпоинта остается без изменений ...
     # 1. Извлечение климатических данных из БД
     city_query = await db.execute(
         text("SELECT t_winter_5day, t_summer_max FROM climatology WHERE id = :id"),
